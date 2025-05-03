@@ -9,8 +9,8 @@ namespace es {
  *
  * @param description
  */
-Subscriber::Subscriber(std::string description)
-    : name(description), core::ActiveObject<Event>(description) {
+Subscriber::Subscriber(std::string_view description)
+    : name(description), core::ActiveObject<EventPtr>(description) {
   service = EventService::get();
 }
 
@@ -20,17 +20,18 @@ Subscriber::Subscriber(std::string description)
  */
 Subscriber::~Subscriber() { unsubscribe(); }
 
-void Subscriber::process(const std::shared_ptr<Event> &event) {
-  throw std::logic_error("prcocess function is not implemented");
-}
 /**
  * @brief
  *
  */
 void Subscriber::subscribe() {
-  auto handler = std::bind(&Subscriber::onData, this, std::placeholders::_1);
-  this->subscriptionToken = service->subscribe(handler);
-  this->run();
+  try {
+    auto handler = std::bind(&Subscriber::onData, this, std::placeholders::_1);
+    this->subscriptionToken = service->subscribe(handler);
+    this->run();
+  } catch (const std::exception &e) {
+    std::cerr << "Failed to subscribe" << e.what() << '\n';
+  }
 }
 
 /**
@@ -38,7 +39,11 @@ void Subscriber::subscribe() {
  *
  */
 void Subscriber::unsubscribe() {
-  service->unsubscribe(this->subscriptionToken);
+  try {
+    service->unsubscribe(this->subscriptionToken);
+  } catch (const std::exception &e) {
+    std::cerr << "Failed to unsubscribe " << e.what() << '\n';
+  }
 }
 
 } // namespace es

@@ -3,7 +3,7 @@
 #define NOTIFIER_HPP
 
 #include "Signal.hpp"
-#include <memory>
+
 
 namespace es {
 
@@ -21,45 +21,36 @@ public:
   Notifier() : Signal<T>() {}
 
   /**
-   * @brief Subscribe to notifications
-   *
-   * @param on_signal
-   * @return const Token&
+   * @brief Subscribe to notifications.
+   * @param on_signal The function to be called when data is published.
+   * @return const Token A unique token representing the subscription.
    */
-  const Token subscribe(subscriber_function on_signal) {
+  [[nodiscard]] const Token subscribe(subscriber_function on_signal) {
     return this->connect(on_signal, "");
   }
 
   /**
-   * @brief Unsubscribe
-   *
-   * @param token
+   * @brief Unsubscribe from notifications.
+   * @param token The token representing the subscription to be removed.
    */
   void unsubscribe(const Token &token) { return this->disconnect(token); }
 
   /**
-   * @brief Unsubscribe
-   *
-   * @param token
+   * @brief Unsubscribe all subscribers.
    */
   void unsubscribe_all() { return this->disconnect_all(); }
 
   /**
-   * @brief Publish data
-   *
-   * @param data
+   * @brief Publish data to all subscribers.
+   * @param data The data to be published.
    */
   void publish(const T &data) { this->operator()(data); }
 
   /**
-   * @brief returns the number of subscribers
-   *
-   * @return int
+   * @brief Get the number of subscribers.
+   * @return int The number of active subscribers.
    */
-  int nof_subscriber() { return this->size(); }
-
-private:
-  static std::shared_ptr<Notifier> _instance;
+  std::size_t nof_subscriber() { return this->size(); }
 };
 
 } // namespace es

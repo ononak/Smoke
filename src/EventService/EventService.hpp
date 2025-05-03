@@ -2,26 +2,43 @@
 #define EVENT_SERVICE_HPP
 #pragma once
 
-#include "Notifier.hpp"
 #include "Event.hpp"
+#include "Notifier.hpp"
 #include <memory>
 
 namespace es {
 
-using EventHandler = Notifier<std::shared_ptr<Event>>::subscriber_function;
+using EventHandler = Notifier<EventPtr>::subscriber_function;
 
-typedef std::string EventChannel;
+using EventChannel = std::string ;
 
-class EventService : public Notifier<std::shared_ptr<Event>> {
+/**
+ * @brief Singleton service for managing and notifying subscribers about events.
+ */class EventService : public Notifier<EventPtr> {
 private:
-  EventService();
+  EventService() = default;
 
 private:
-  static std::shared_ptr<EventService> instance;
+  inline static std::once_flag _onceFlag;
+  inline static std::shared_ptr<EventService> instance = nullptr;
+
 public:
+  /**
+   * @brief Get the singleton instance of the EventService.
+   * @return A shared pointer to the EventService instance.
+   */
   static std::shared_ptr<EventService> get();
-  virtual ~EventService();
+  virtual ~EventService() = default;
+    /**
+   * @brief Start the event processing loop.
+   */
   void run();
+
+private:
+  EventService(const EventService &) = delete;
+  EventService &operator=(const EventService &) = delete;
+  EventService(EventService &&) = delete;
+  EventService &operator=(EventService &&) = delete;
 };
 
 } // namespace es
