@@ -1,10 +1,14 @@
 #ifndef SIGNAL_HPP
 #define SIGNAL_HPP
 
+#include <algorithm>
 #include <functional>
+#include <iostream>
 #include <map>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
+#include <string_view>
 
 namespace es {
 
@@ -18,12 +22,12 @@ class Token {
   friend bool operator<(const Token &a, const Token &b);
 
 public:
-  Token(){};
+  Token() = default;
   /**
    * @brief Destroy the Token object
    *
    */
-  virtual ~Token(){};
+  virtual ~Token() = default;
 
   /**
    * @brief Construct a new Token object
@@ -41,7 +45,8 @@ private:
    * @param id
    * @param key
    */
-  Token(int id, const std::string &key) : _identifier(id), _keyword(key){};
+  Token(int id, const std::string_view &key)
+      : _identifier(id), _keyword(key) {};
 };
 
 /**
@@ -61,7 +66,7 @@ public:
   virtual void disconnect(const Token &Token) noexcept = 0;
   virtual void disconnect_all() noexcept = 0;
   virtual void operator()(const T &value) = 0;
-  virtual size_t size() = 0;
+  virtual size_t size() const = 0;
 };
 
 /**
@@ -84,7 +89,7 @@ public:
    *
    */
   virtual ~Signal() {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::scoped_lock lock(_mutex);
     _slots.clear();
   }
 
@@ -95,10 +100,10 @@ public:
    * @param keyword
    * @return const Token
    */
-  virtual const Token
+  [[nodiscard]] virtual const Token
   connect(typename ISignal<T>::function_type slot,
           const std::string &keyword = "") noexcept override {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::scoped_lock lock(_mutex);
     auto key = Token(_counter++, keyword);
     _slots.insert({key, slot});
     return key;
@@ -110,7 +115,7 @@ public:
    * @param Token
    */
   virtual void disconnect(const Token &Token) noexcept override {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::scoped_lock lock(_mutex);
     _slots.erase(Token);
   }
 
@@ -119,9 +124,8 @@ public:
    *
    */
   virtual void disconnect_all() noexcept override {
-    std::lock_guard<std::mutex> lock(_mutex);
-    for (auto [token, subs] : _slots)
-      _slots.erase(token);
+    std::scoped_lock lock(_mutex);
+    _slots.clear();
   }
 
   /**
@@ -130,10 +134,16 @@ public:
    * @param value
    */
   virtual void operator()(const T &value) override {
-    std::lock_guard<std::mutex> lock(_mutex);
-    for (auto sl : _slots) {
-      sl.second.operator()(value);
-    }
+    std::scoped_lock lock(_mutex);
+    std::ranges::for_each(_slots, [&value](auto &sl) {
+      try {
+        sl.second(value);
+      } catch (const std::exception &e) {
+        std::cerr << "Callback threw an exception: " << e.what() << '\n';
+      } catch (...) {
+        std::cerr << "Callback threw an unknown exception.\n";
+      }
+    });
   }
 
   /**
@@ -141,22 +151,21 @@ public:
    *
    * @return size_t
    */
-  virtual size_t size() override {
-    std::lock_guard<std::mutex> lock(_mutex);
+  [[nodiscard]] virtual size_t size() const override {
+    std::shared_lock lock(_mutex);
     return _slots.size();
   }
 
 private:
-  static int _counter;
-  std::mutex _mutex;
+  inline static std::atomic<int> _counter = 0;
+  mutable std::shared_mutex _mutex;
   typename ISignal<T>::function_container_type _slots;
 
   Signal(const Signal &) = delete;
-  Signal(const Signal &&) = delete;
+  Signal(Signal &&) = delete;
   Signal &operator=(const Signal &) = delete;
 };
 
-template <typename T> int Signal<T>::_counter = 0;
 
 } // namespace es
 
